@@ -1,110 +1,82 @@
 <template>
-  <section class="manage-page">
+  <section>
     <div class="page-intro">
-      <div>
-        <h2>题目管理</h2>
-        <p>维护 Web 基础知识题库，当前页面使用静态演示数据。</p>
-      </div>
-      <el-button type="primary" icon="el-icon-plus" @click="openCreate">添加题目</el-button>
+      <h2>题目管理</h2>
+      <p>Web 基础知识题库，页面数据为演示内容。</p>
     </div>
 
-    <div class="panel query-panel">
-      <div class="panel-title">查询题目</div>
+    <div class="panel">
       <el-form :inline="true" :model="query" class="query-form" @submit.native.prevent>
         <el-form-item label="题目">
           <el-input
             v-model.trim="query.keyword"
             clearable
             placeholder="请输入题目关键词"
-            prefix-icon="el-icon-search"
             @keyup.enter.native="handleSearch"
           />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" icon="el-icon-search" @click="handleSearch">查询</el-button>
-          <el-button icon="el-icon-refresh" @click="handleReset">重置</el-button>
+          <el-button type="primary" @click="handleSearch">查询</el-button>
+          <el-button icon="el-icon-plus" @click="openAdd">增加</el-button>
         </el-form-item>
       </el-form>
     </div>
 
     <div class="panel">
       <div class="table-toolbar">
-        <div class="table-title">
-          <span>题目列表</span>
-          <el-tag size="mini" type="info" effect="plain">共 {{ filteredQuestions.length }} 条</el-tag>
-        </div>
-        <span class="table-hint">数据为演示内容，未连接数据库</span>
+        <span class="table-title">题目列表</span>
+        <el-tag size="small" type="info" effect="plain">共 {{ filtered.length }} 条</el-tag>
       </div>
 
-      <el-table
-        :data="pagedQuestions"
-        row-key="id"
-        stripe
-        class="data-table"
-        empty-text="暂无匹配的题目"
-      >
-        <el-table-column prop="date" label="日期" width="150" />
-        <el-table-column prop="title" label="题目" min-width="340" show-overflow-tooltip>
+      <el-table :data="paged" row-key="id" stripe empty-text="暂无匹配的题目">
+        <el-table-column prop="date" label="日期" width="130" />
+        <el-table-column prop="title" label="题目" min-width="300" show-overflow-tooltip />
+        <el-table-column label="答案" min-width="150">
           <template slot-scope="{ row }">
-            <span class="question-text">{{ row.title }}</span>
+            <el-tag size="small" type="success" effect="plain">{{ row.answer }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="答案" min-width="180">
+        <el-table-column label="操作" width="130">
           <template slot-scope="{ row }">
-            <el-tag size="small" effect="plain" type="success">{{ row.answer }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="170">
-          <template slot-scope="{ row }">
-            <el-button type="text" icon="el-icon-edit" @click="openEdit(row)">编辑</el-button>
-            <el-button type="text" class="danger-text" icon="el-icon-delete" @click="handleDelete(row)">删除</el-button>
+            <el-button type="text" @click="notReady">编辑</el-button>
+            <el-button type="text" class="danger-text" @click="notReady">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
 
-      <app-pager
-        :total="filteredQuestions.length"
-        :page="page"
-        :page-size="pageSize"
-        @page-change="handlePageChange"
-        @size-change="handleSizeChange"
-      />
+      <div class="app-pager">
+        <el-pagination
+          background
+          :current-page="page"
+          :page-size="pageSize"
+          :page-sizes="[5, 8, 10]"
+          :total="filtered.length"
+          layout="sizes, prev, pager, next, jumper"
+          @current-change="page = $event"
+          @size-change="handleSizeChange"
+        />
+      </div>
     </div>
 
-    <el-dialog
-      :title="dialogMode === 'create' ? '添加题目' : '编辑题目'"
-      :visible.sync="dialogVisible"
-      width="520px"
-      :close-on-click-modal="false"
-      @closed="resetForm"
-    >
-      <el-form ref="questionForm" :model="form" :rules="rules" label-width="76px">
+    <el-dialog title="增加题目" :visible.sync="addVisible" width="480px">
+      <el-form ref="addForm" :model="form" :rules="rules" label-width="60px">
         <el-form-item label="题目" prop="title">
-          <el-input
-            v-model.trim="form.title"
-            type="textarea"
-            :rows="3"
-            maxlength="120"
-            show-word-limit
-            placeholder="请输入题目内容，例如：HTML 中用于创建超链接的标签是？"
-          />
+          <el-input v-model.trim="form.title" type="textarea" :rows="3" placeholder="请输入题目内容" />
         </el-form-item>
         <el-form-item label="答案" prop="answer">
-          <el-input v-model.trim="form.answer" placeholder="请输入正确答案" maxlength="60" />
+          <el-input v-model.trim="form.answer" placeholder="请输入正确答案" />
         </el-form-item>
       </el-form>
       <div slot="footer">
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitForm">确定</el-button>
+        <el-button @click="addVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleAdd">确定</el-button>
       </div>
     </el-dialog>
   </section>
 </template>
 
 <script>
-import AppPager from '../components/AppPager.vue'
-
-const buildQuestions = () => [
+const questions = [
   { id: 1, date: '2026-08-04', title: 'HTML 中用于创建超链接的标签是？', answer: '<a>' },
   { id: 2, date: '2026-08-07', title: 'CSS 中用于设置文字颜色的属性是？', answer: 'color' },
   { id: 3, date: '2026-08-12', title: 'JavaScript 中声明块级作用域常量的关键字是？', answer: 'const' },
@@ -121,97 +93,56 @@ const buildQuestions = () => [
 
 export default {
   name: 'QuestionView',
-  components: { AppPager },
   data() {
     return {
+      questions,
       query: { keyword: '' },
-      appliedKeyword: '',
+      keyword: '',
       page: 1,
       pageSize: 5,
-      questions: buildQuestions(),
-      dialogVisible: false,
-      dialogMode: 'create',
-      editingId: null,
+      addVisible: false,
       form: { title: '', answer: '' },
       rules: {
-        title: [
-          { required: true, message: '请输入题目内容', trigger: 'blur' },
-          { min: 4, message: '题目内容至少 4 个字符', trigger: 'blur' }
-        ],
+        title: [{ required: true, message: '请输入题目内容', trigger: 'blur' }],
         answer: [{ required: true, message: '请输入正确答案', trigger: 'blur' }]
       }
     }
   },
   computed: {
-    filteredQuestions() {
-      const keyword = this.appliedKeyword.trim()
-      if (!keyword) return this.questions
-      return this.questions.filter((item) => item.title.includes(keyword))
+    filtered() {
+      const keyword = this.keyword
+      return keyword ? this.questions.filter((item) => item.title.includes(keyword)) : this.questions
     },
-    pagedQuestions() {
+    paged() {
       const start = (this.page - 1) * this.pageSize
-      return this.filteredQuestions.slice(start, start + this.pageSize)
+      return this.filtered.slice(start, start + this.pageSize)
     }
   },
   methods: {
     handleSearch() {
-      this.appliedKeyword = this.query.keyword
+      this.keyword = this.query.keyword
       this.page = 1
-    },
-    handleReset() {
-      this.query.keyword = ''
-      this.appliedKeyword = ''
-      this.page = 1
-    },
-    handlePageChange(page) {
-      this.page = page
     },
     handleSizeChange(size) {
       this.pageSize = size
       this.page = 1
     },
-    openCreate() {
-      this.resetForm()
-      this.dialogMode = 'create'
-      this.dialogVisible = true
-    },
-    openEdit(row) {
-      this.resetForm()
-      this.dialogMode = 'edit'
-      this.editingId = row.id
-      this.form = { title: row.title, answer: row.answer }
-      this.dialogVisible = true
-    },
-    resetForm() {
+    openAdd() {
       this.form = { title: '', answer: '' }
-      this.editingId = null
+      this.addVisible = true
       this.$nextTick(() => {
-        if (this.$refs.questionForm) this.$refs.questionForm.clearValidate()
+        this.$refs.addForm && this.$refs.addForm.clearValidate()
       })
     },
-    submitForm() {
-      this.$refs.questionForm.validate((valid) => {
+    handleAdd() {
+      this.$refs.addForm.validate((valid) => {
         if (!valid) return
-        this.dialogVisible = false
-        this.$alert('还没有连接数据库', '提示', {
-          confirmButtonText: '知道了',
-          type: 'warning'
-        })
+        this.addVisible = false
+        this.$alert('暂时不能增加', '提示', { type: 'warning' })
       })
     },
-    handleDelete(row) {
-      this.$confirm(`确定要删除题目「${row.title}」吗？`, '删除确认', {
-        confirmButtonText: '删除',
-        cancelButtonText: '取消',
-        type: 'warning'
-      })
-        .then(() => {
-          this.$alert('还没有连接数据库', '提示', {
-            confirmButtonText: '知道了',
-            type: 'warning'
-          })
-        })
-        .catch(() => {})
+    notReady() {
+      this.$message.info('演示数据，暂不支持该操作')
     }
   }
 }

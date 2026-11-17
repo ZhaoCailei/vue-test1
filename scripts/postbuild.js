@@ -1,8 +1,6 @@
 /**
- * 构建后处理：
- * Chromium 内核浏览器直接双击打开 file:// 页面时，会以 CORS 策略拦截本地字体文件，
- * 导致 Element UI 的图标字体（element-icons）加载失败。这里把 dist/css 中引用的
- * 字体文件转成 base64 内联进 CSS，这样 dist/index.html 双击即可正常显示所有图标。
+ * 构建后处理：把 dist/css 中引用的字体文件转成 base64 内联进 CSS。
+ * 这样 dist/index.html 用 file:// 双击打开时，Element UI 的图标字体不会被 CORS 拦截。
  */
 const fs = require('fs')
 const path = require('path')
